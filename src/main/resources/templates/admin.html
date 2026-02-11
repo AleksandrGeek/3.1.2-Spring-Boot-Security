@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Admin Page</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+<h1>Welcome, <span th:text="${user.username}">Admin</span>!</h1>
+<p>Your email: <span th:text="${user.email}">Email</span></p>
+<p>Your roles: <span th:text="${user.roles}">Roles</span></p>
+
+<h2>User Management</h2>
+<a href="/admin/new">Add New User</a>
+
+<table>
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Roles</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="u : ${users}">
+        <td th:text="${u.id}">1</td>
+        <td th:text="${u.username}">user</td>
+        <td th:text="${u.email}">user@mail.com</td>
+        <td th:text="${u.roles}">[ROLE_USER]</td>
+        <td>
+            <a th:href="@{/admin/edit/{id}(id=${u.id})}">Edit</a>
+            |
+            <form th:action="@{/admin/delete/{id}(id=${u.id})}" method="post"
+                  style="display:inline">
+                <input type="submit" value="Delete"
+                       onclick="return confirm('Are you sure?')"/>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<!-- Пункт 6: Logout с Thymeleaf -->
+<form th:action="@{/logout}" method="post">
+    <input type="submit" value="Logout"/>
+</form>
+</body>
+</html>
