@@ -1,70 +1,79 @@
 package ru.kata.spring.boot_security.demo.services;
 
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.kata.spring.boot_security.demo.dao.UserDao;
 import ru.kata.spring.boot_security.demo.entities.Role;
 import ru.kata.spring.boot_security.demo.entities.User;
-import ru.kata.spring.boot_security.demo.repositories.RoleRepository;
-import ru.kata.spring.boot_security.demo.repositories.UserRepository;
 
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-
+@Slf4j
 @Service
-@Transactional
 public class UserServiceImpl implements UserService {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
+    private final UserDao userDao;
+    private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
 
 
-    public UserServiceImpl(UserRepository userRepository,
-                           RoleRepository roleRepository,
+    public UserServiceImpl(UserDao userDao,
+                           RoleService roleService,
                            PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
+        this.userDao = userDao;
+        this.roleService = roleService;
         this.passwordEncoder = passwordEncoder;
     }
 
-
     @Override
+    @Transactional
     public void createUser(User user, Set<Long> roleIds) {
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new IllegalArgumentException("Username already exists");
+        // Проверка на существование
+        if (findByUsername(user.getUsername()) != null) {
+            log.error("User with name {} already exists", user.getUsername());
+            throw new IllegalArgumentException("Username already exists: " + user.getUsername());
         }
 
+        // Шифруем пароль
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
+        // ✅ Получаем роли через getRoleById в цикле
         Set<Role> roles = new HashSet<>();
         for (Long roleId : roleIds) {
-            Role role = roleRepository.findById(roleId)
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            Role role = roleService.getRoleById(roleId);  // ← используем существующий метод!
             roles.add(role);
+            log.debug("Added role: {} to user", role.getName());
         }
-        user.setRoles(roles);  // Устанавливаем все роли
 
-        userRepository.save(user);  // Сохраняем ОДИН раз
+        user.setRoles(roles);
+        userDao.createUser(user);
+        log.info("User created: {}", user.getUsername());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new
-                IllegalArgumentException(String.format("User with id %d not found" + id)));
-
+        return userDao.getById(id)
+                .orElseThrow(() -> {
+                    log.error("User not found with id: {}", id);
+                    return new IllegalArgumentException("User not found with id: " + id);
+                });
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userDao.getAll();
     }
 
     @Override
+    @Transactional
     public void updateUser(User user, Set<Long> roleIds) {
         User existingUser = getUserById(user.getId());
 
@@ -74,29 +83,30 @@ public class UserServiceImpl implements UserService {
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             existingUser.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+
+        // ✅ Тот же подход для обновления
         Set<Role> roles = new HashSet<>();
         for (Long roleId : roleIds) {
-            Role role = roleRepository.findById(roleId)
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            Role role = roleService.getRoleById(roleId);  // ← используем существующий метод!
             roles.add(role);
         }
+
         existingUser.setRoles(roles);
-
-        userRepository.save(existingUser);
+        userDao.update(existingUser);
+        log.info("User updated: {}", user.getUsername());
     }
 
-
     @Override
+    @Transactional
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("User not found");
-        }
-        userRepository.deleteById(id);
+        User user = getUserById(id);
+        userDao.delete(id);
+        log.info("User deleted: {} (id: {})", user.getUsername(), id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User findByUsername(String username) {
-        return userRepository.findByUsername(username).orElseThrow(() ->
-                new UsernameNotFoundException("User not found"));
+        return userDao.findByUsername(username).orElse(null);
     }
 }

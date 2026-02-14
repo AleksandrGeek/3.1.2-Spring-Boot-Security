@@ -1,37 +1,62 @@
 package ru.kata.spring.boot_security.demo.services;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.kata.spring.boot_security.demo.dao.RoleDao;
 import ru.kata.spring.boot_security.demo.entities.Role;
-import ru.kata.spring.boot_security.demo.repositories.RoleRepository;
-
 import java.util.List;
 
 
+@Slf4j
 @Service
-@Transactional
 public class RoleServiceImpl implements RoleService {
 
-    private final RoleRepository roleRepository;
+    private final RoleDao roleDao;
 
-    public RoleServiceImpl(RoleRepository roleRepository) {
-        this.roleRepository = roleRepository;
+    public RoleServiceImpl(RoleDao roleDao) {
+        this.roleDao = roleDao;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Role> getAllRoles() {
-        return roleRepository.findAll();
+        return roleDao.getAllRoles();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Role getRoleById(Long id) {
-        return roleRepository.findById(id).orElseThrow(() ->
-                new IllegalArgumentException("Role not found"));
+        return roleDao.getRoleById(id)
+                .orElseThrow(() -> {
+                    log.error("Role not found with id: {}", id);  // ✅ Только ошибка!
+                    return new IllegalArgumentException("Role not found with id: " + id);
+                });
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Role findByName(String name) {
-        return roleRepository.findByName(name).orElseThrow(() ->
-                new IllegalArgumentException("Role not found"));
+        return roleDao.findByName(name)
+                .orElseThrow(() -> {
+                    log.error("Role not found with name: {}", name);  // ✅ Только ошибка!
+                    return new IllegalArgumentException("Role not found with name: " + name);
+                });
     }
+
+    @Override
+    @Transactional
+    public Role createRole(String roleName) {
+        // Проверяем, есть ли уже такая роль
+        try {
+            return findByName(roleName);  // Если есть - возвращаем
+        } catch (IllegalArgumentException e) {
+            // Создаем новую роль
+            Role role = new Role(roleName);
+            roleDao.save(role);
+            log.info("Created new role: {}", roleName);  // ✅ Важно! Создание роли
+            return role;
+        }
+    }
+
 }

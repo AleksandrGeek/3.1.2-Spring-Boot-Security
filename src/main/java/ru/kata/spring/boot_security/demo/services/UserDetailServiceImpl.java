@@ -1,47 +1,34 @@
 package ru.kata.spring.boot_security.demo.services;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.kata.spring.boot_security.demo.entities.User;
-import ru.kata.spring.boot_security.demo.repositories.UserRepository;
+import ru.kata.spring.boot_security.demo.dao.UserDao;
 
 
+@Slf4j
 @Service
-@Transactional(readOnly = true)
 public class UserDetailServiceImpl implements UserDetailsService {
 
-    private final UserRepository userRepository;
+    private final UserDao userDao;
 
     @Autowired
-    public UserDetailServiceImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-        System.out.println("✅ UserDetailServiceImpl created!");
+    public UserDetailServiceImpl(UserDao userDao) {
+        this.userDao = userDao;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // ОТЛАДОЧНЫЙ КОД - должен появиться в логах!
-        System.out.println("========================");
-        System.out.println("=== LOADING USER: " + username + " ===");
-
-        User user = userRepository.findByUsername(username)
+        return userDao.findByUsername(username)
                 .orElseThrow(() -> {
-                    System.out.println("!!! USER NOT FOUND: " + username);
-                    return new UsernameNotFoundException(
-                            String.format("User '%s' not found", username));
+                    log.error("User not found: {}", username);
+                    return new UsernameNotFoundException("User not found: " + username);
                 });
 
-        System.out.println("✅ User found: " + user.getUsername());
-        System.out.println("🔑 Password hash: " + user.getPassword());
-        System.out.println("🔑 Password starts with $2a$: " + user.getPassword().startsWith("$2a$"));
-        System.out.println("📋 Roles (" + user.getRoles().size() + "):");
-        user.getRoles().forEach(role -> System.out.println("   - " + role.getName()));
-        System.out.println("========================");
-
-        return user;
     }
 }

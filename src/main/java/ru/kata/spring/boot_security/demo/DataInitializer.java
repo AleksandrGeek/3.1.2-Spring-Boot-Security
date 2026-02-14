@@ -1,98 +1,70 @@
 package ru.kata.spring.boot_security.demo;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.kata.spring.boot_security.demo.entities.Role;
 import ru.kata.spring.boot_security.demo.entities.User;
-import ru.kata.spring.boot_security.demo.repositories.RoleRepository;
-import ru.kata.spring.boot_security.demo.repositories.UserRepository;
+import ru.kata.spring.boot_security.demo.services.RoleService;
+import ru.kata.spring.boot_security.demo.services.UserService;
 
 import javax.annotation.PostConstruct;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Optional;
+import java.util.Set;
 
+@Slf4j
 @Component
 public class DataInitializer {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;    // ✅ Только сервисы
+    private final RoleService roleService;    // ✅ Только сервисы
 
-    public DataInitializer(UserRepository userRepository,
-                           RoleRepository roleRepository,
-                           PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
+    public DataInitializer(UserService userService, RoleService roleService) {
+        this.userService = userService;
+        this.roleService = roleService;
     }
 
     @PostConstruct
     @Transactional
     public void init() {
-        System.out.println("=== STARTING DATA INITIALIZATION ===");
+        log.info("=== STARTING DATA INITIALIZATION ===");
 
-        // 1. Создаем роли
-        Optional<Role> adminRoleOpt = roleRepository.findByName("ROLE_ADMIN");
-        Role adminRole;
-        if (adminRoleOpt.isEmpty()) {
-            adminRole = new Role("ROLE_ADMIN");
-            roleRepository.save(adminRole);
-            System.out.println("✅ Created role: ROLE_ADMIN");
-        } else {
-            adminRole = adminRoleOpt.get();
-            System.out.println("✅ Role ROLE_ADMIN already exists");
-        }
+        // 1. Создаем роли через RoleService
+        Role adminRole = createRoleIfNotExists("ROLE_ADMIN");
+        Role userRole = createRoleIfNotExists("ROLE_USER");
+        log.info("✅ Roles ready: ADMIN, USER");
 
-        Optional<Role> userRoleOpt = roleRepository.findByName("ROLE_USER");
-        Role userRole;
-        if (userRoleOpt.isEmpty()) {
-            userRole = new Role("ROLE_USER");
-            roleRepository.save(userRole);
-            System.out.println("✅ Created role: ROLE_USER");
-        } else {
-            userRole = userRoleOpt.get();
-            System.out.println("✅ Role ROLE_USER already exists");
-        }
-
-        // 2. Создаем пользователей если их нет
-        if (userRepository.findByUsername("admin").isEmpty()) {
+        // 2. Создаем админа через UserService (пароль передаем сырой!)
+        if (userService.findByUsername("admin") == null) {
             User admin = new User();
             admin.setUsername("admin");
-
-            // Кодируем пароль
-            String encodedPassword = passwordEncoder.encode("admin");
-            admin.setPassword(encodedPassword);
-            System.out.println("Admin password encoded: " + encodedPassword);
-
+            admin.setPassword("admin");           // ✅ СЫРОЙ пароль!
             admin.setEmail("admin@test.com");
-            admin.setRoles(new HashSet<>(Arrays.asList(adminRole, userRole)));
 
-            userRepository.save(admin);
-            System.out.println("✅ Created user: admin/admin (roles: ADMIN, USER)");
-        } else {
-            System.out.println("❌ User 'admin' already exists");
+            userService.createUser(admin, Set.of(adminRole.getId(), userRole.getId()));
+            log.info("Admin user created: {} (id: {})", admin.getUsername(), admin.getId());
         }
 
-        if (userRepository.findByUsername("user").isEmpty()) {
+        // 3. Создаем пользователя через UserService
+        if (userService.findByUsername("user") == null) {
             User user = new User();
             user.setUsername("user");
-
-            // Кодируем пароль
-            String encodedPassword = passwordEncoder.encode("user");
-            user.setPassword(encodedPassword);
-            System.out.println("User password encoded: " + encodedPassword);
-
+            user.setPassword("user");             // ✅ СЫРОЙ пароль!
             user.setEmail("user@test.com");
-            user.setRoles(new HashSet<>(Arrays.asList(userRole)));
 
-            userRepository.save(user);
-            System.out.println("✅ Created user: user/user (role: USER)");
-        } else {
-            System.out.println("❌ User 'user' already exists");
+            userService.createUser(user, Set.of(userRole.getId()));
+            log.info("Regular user created: {} (id: {})", user.getUsername(), user.getId());
         }
 
         System.out.println("=== DATA INITIALIZATION COMPLETE ===");
+    }
+
+    private Role createRoleIfNotExists(String roleName) {
+        try {
+            return roleService.findByName(roleName);
+        } catch (Exception e) {
+            // Добавьте метод createRole в RoleService
+            return roleService.createRole(roleName);
+        }
     }
 }

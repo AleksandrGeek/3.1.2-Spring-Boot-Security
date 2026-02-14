@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import ru.kata.spring.boot_security.demo.entities.User;
 import ru.kata.spring.boot_security.demo.services.UserService;
 
-@Controller()
+@Controller
 @RequestMapping("/user")
 public class UserController {
 
