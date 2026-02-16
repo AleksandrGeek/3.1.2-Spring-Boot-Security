@@ -34,6 +34,8 @@ public class AdminController {
 
     @GetMapping
     public String adminPage(@AuthenticationPrincipal User user, Model model) {
+        // @AuthenticationPrincipal - аннотация Spring Security
+        // достает текущего пользователя из контекста безопасности
         model.addAttribute("user", user);
         model.addAttribute("users", userService.getAllUsers());
         return "admin";
